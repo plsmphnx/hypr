@@ -28,6 +28,7 @@ func (cmd Cmd) Call() error {
 	if err != nil {
 		return err
 	}
+
 	var e Err
 	for i, r := range res {
 		sr := string(r)
@@ -38,6 +39,7 @@ func (cmd Cmd) Call() error {
 	if len(e) > 0 {
 		return e
 	}
+
 	return nil
 }
 

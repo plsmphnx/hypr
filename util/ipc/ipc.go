@@ -2,20 +2,22 @@ package ipc
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"net"
 	"os"
+	"path"
 	"strings"
 )
 
 func Call(cmds ...string) ([][]byte, error) {
-	conn, err := net.DialUnix("unix", nil, &net.UnixAddr{
-		Name: fmt.Sprintf("%s/hypr/%s/.socket.sock",
-			os.Getenv("XDG_RUNTIME_DIR"),
-			os.Getenv("HYPRLAND_INSTANCE_SIGNATURE"),
-		),
-	})
+	if len(cmds) == 0 {
+		return nil, nil
+	}
+
+	conn, err := net.DialUnix("unix", nil, &net.UnixAddr{Name: path.Join(
+		os.Getenv("XDG_RUNTIME_DIR"), "hypr",
+		os.Getenv("HYPRLAND_INSTANCE_SIGNATURE"), ".socket.sock",
+	)})
 	if err != nil {
 		return nil, err
 	}

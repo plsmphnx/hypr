@@ -11,14 +11,17 @@ func (g Get) Call() error {
 		cmd = append(cmd, "j/"+c)
 		arg = append(arg, a)
 	}
+
 	res, err := Call(cmd...)
 	if err != nil {
 		return err
 	}
+
 	for i, r := range res {
 		if err := json.Unmarshal(r, arg[i]); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }

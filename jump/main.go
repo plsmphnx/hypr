@@ -1,10 +1,10 @@
 package main
 
 import (
-	"fmt"
 	"math"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/plsmphnx/hypr/util/ipc"
@@ -93,14 +93,14 @@ func main() {
 
 	var cmd ipc.Cmd
 	for _, d := range disp {
-		cmd.Dispatch(strings.ReplaceAll(d, "@", fmt.Sprint(id)))
+		cmd.Dispatch(strings.ReplaceAll(d, "@", strconv.Itoa(id)))
 	}
 	check(cmd.Call())
 }
 
 func check(e error) {
 	if e != nil {
-		fmt.Fprintln(os.Stderr, e)
+		os.Stderr.WriteString(e.Error())
 		os.Exit(1)
 	}
 }

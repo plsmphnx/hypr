@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"slices"
 	"strings"
@@ -158,7 +157,7 @@ func (t *Target) Keyword() string {
 
 func check(e error) {
 	if e != nil {
-		fmt.Fprintln(os.Stderr, e)
+		os.Stderr.WriteString(e.Error())
 		os.Exit(1)
 	}
 }
