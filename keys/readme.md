@@ -8,12 +8,12 @@ the modifier keys.
 
 ## Usage
 
-Simply include binds with modifiers as usual in your `hyprland.conf` and call:
+Simply add the following to the end of your `hyprland.conf`:
 
 ```
-hyprkeys <hyprland.conf>
+exec = hyprkeys [MODS[=alias]...]
 ```
 
-The tool will generate submap names from the combination of modifier keys;
-alternatively, the `#alias=MODS,name` directive can be used to rename the submap
-for a particular modifier combination.
+The tool will generate a submap for each listed modifier combination (using the
+normal Hyprland syntax), using either the modifiers as listed or the provided
+alias as the submap name.

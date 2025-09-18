@@ -1,18 +1,15 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"math"
-	"net"
 	"os"
 	"slices"
 	"strings"
-)
 
-type IPC string
+	"github.com/plsmphnx/hypr/util/ipc"
+)
 
 type Workspace struct {
 	ID        int `json:"id"`
@@ -22,12 +19,6 @@ type Workspace struct {
 }
 
 func main() {
-	defer func() {
-		if e := recover(); e != nil {
-			fmt.Fprintln(os.Stderr, e)
-		}
-	}()
-
 	var disp []string
 	var prev bool
 	var free int8
@@ -55,19 +46,17 @@ func main() {
 		disp = []string{"workspace @"}
 	}
 
-	ipc := IPC(fmt.Sprintf("%s/hypr/%s/.socket.sock",
-		os.Getenv("XDG_RUNTIME_DIR"),
-		os.Getenv("HYPRLAND_INSTANCE_SIGNATURE"),
-	))
+	var cmd ipc.Cmd
+	ipc := ipc.New()
 
-	var active Workspace
-	var workspaces []Workspace
-	info := ipc.Call("j/activeworkspace", "j/workspaces")
+	var active *Workspace
+	var workspaces []*Workspace
+	info := must(ipc.Call("j/activeworkspace", "j/workspaces"))
 	check(json.Unmarshal(info[0], &active))
 	check(json.Unmarshal(info[1], &workspaces))
-	slices.SortFunc(workspaces, func(a, b Workspace) int { return a.ID - b.ID })
+	slices.SortFunc(workspaces, func(a, b *Workspace) int { return a.ID - b.ID })
 
-	var monitor []Workspace
+	var monitor []*Workspace
 	for i, ws := range workspaces {
 		ws.i = i
 		if ws.MonitorID == active.MonitorID {
@@ -108,33 +97,16 @@ func main() {
 		}
 	}()))
 
-	for i, d := range disp {
-		d = strings.Replace(d, "@", fmt.Sprint(id), -1)
-		disp[i] = "/dispatch " + strings.TrimSpace(d)
+	for _, d := range disp {
+		cmd.Dispatch(strings.ReplaceAll(d, "@", fmt.Sprint(id)))
 	}
-	for _, res := range ipc.Call(disp...) {
-		if string(res) != "ok" {
-			fmt.Fprintln(os.Stderr, string(res))
-		}
-	}
-}
-
-func (ipc IPC) Call(cmds ...string) [][]byte {
-	conn := must(net.DialUnix("unix", nil, &net.UnixAddr{Name: string(ipc)}))
-	defer func() { check(conn.Close()) }()
-
-	cmd := cmds[0]
-	if len(cmds) > 1 {
-		cmd = "[[BATCH]]" + strings.Join(cmds, ";")
-	}
-
-	io.WriteString(conn, cmd)
-	return bytes.Split(must(io.ReadAll(conn)), []byte{'\n', '\n', '\n'})
+	check(ipc.Exec(cmd))
 }
 
 func check(e error) {
 	if e != nil {
-		panic(e)
+		fmt.Fprintln(os.Stderr, e)
+		os.Exit(1)
 	}
 }
 

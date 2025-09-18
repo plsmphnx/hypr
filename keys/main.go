@@ -1,280 +1,147 @@
 package main
 
 import (
-	"bufio"
+	"encoding/json"
 	"fmt"
 	"os"
-	"regexp"
-	"sort"
+	"slices"
 	"strings"
+
+	"github.com/plsmphnx/hypr/util/flag"
+	"github.com/plsmphnx/hypr/util/ipc"
+	"github.com/plsmphnx/hypr/util/mod"
 )
 
 type (
-	Variable struct {
-		Name  string
-		Value string
-	}
-
-	Variables []*Variable
-
-	Flags byte
-
 	Target struct {
-		Flags string
-		Key   string
+		flag.Flags
+		Key string `json:"key"`
 	}
 
 	Bind struct {
 		Target
-		Dispatch string
+		Modmask    mod.Mask `json:"modmask"`
+		Submap     string   `json:"submap"`
+		Dispatcher string   `json:"dispatcher"`
+		Arg        string   `json:"arg"`
 	}
-
-	Binds []*Bind
 
 	Submap struct {
 		Alias string
-		Binds Binds
+		Binds []*Bind
 	}
-
-	Submaps map[Flags]*Submap
-
-	Modifier struct {
-		Name []string
-		Flag Flags
-		Keys []string
-	}
-)
-
-var (
-	varRx     = regexp.MustCompile(`^\s*(\$\w+)\s*=(.*)`)
-	bindRx    = regexp.MustCompile(`^\s*bind([lrenmt]*)\s*=([^,]*),([^,]*),(.*)`)
-	aliasRx   = regexp.MustCompile(`^\s*#alias\s*=([^,]*),(.*)`)
-	submapRx  = regexp.MustCompile(`^\s*submap\s*=`)
-	resetRx   = regexp.MustCompile(`^\s*submap\s*=\s*reset`)
-	modifiers = []*Modifier{{
-		Name: []string{"SHIFT"},
-		Flag: 0b00000001,
-		Keys: []string{"shift_l", "shift_r"},
-	}, {
-		Name: []string{"CAPS"},
-		Flag: 0b00000010,
-		Keys: []string{"caps_lock"},
-	}, {
-		Name: []string{"CTRL", "CONTROL"},
-		Flag: 0b00000100,
-		Keys: []string{"control_l", "control_r"},
-	}, {
-		Name: []string{"ALT"},
-		Flag: 0b00001000,
-		Keys: []string{"alt_l", "alt_r"},
-	}, {
-		Name: []string{"MOD2"},
-		Flag: 0b00010000,
-		Keys: []string{},
-	}, {
-		Name: []string{"MOD3"},
-		Flag: 0b00100000,
-		Keys: []string{},
-	}, {
-		Name: []string{"SUPER", "WIN", "LOGO", "MOD4"},
-		Flag: 0b01000000,
-		Keys: []string{"super_l", "super_r"},
-	}, {
-		Name: []string{"MOD5"},
-		Flag: 0b10000000,
-		Keys: []string{},
-	}}
 )
 
 func main() {
-	if len(os.Args) != 2 {
-		fmt.Printf("Usage: %s <hyprland.conf>\n", os.Args[0])
-		os.Exit(1)
+	submaps := make(map[mod.Mask]*Submap, len(os.Args)-1)
+	for _, arg := range os.Args[1:] {
+		submap := &Submap{}
+		mods, alias, _ := strings.Cut(arg, "=")
+		if alias != "" {
+			submap.Alias = alias
+		} else {
+			submap.Alias = strings.TrimSpace(mods)
+		}
+		submaps[mod.Parse(mods)] = submap
 	}
 
-	file, err := os.Open(os.Args[1])
-	if err != nil {
-		panic(err)
-	}
-	defer file.Close()
+	var cmd ipc.Cmd
+	ipc := ipc.New()
 
-	var vars Variables
-	submaps := make(Submaps)
-	var ignore bool
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		if ignore {
-			if resetRx.MatchString(line) {
-				ignore = false
-			}
-			continue
-		}
-
-		if submapRx.MatchString(line) {
-			ignore = true
-			continue
-		}
-
-		if m := varRx.FindStringSubmatch(line); m != nil {
-			vars = append(vars, &Variable{m[1], strings.TrimSpace(m[2])})
-			continue
-		}
-
-		if m := bindRx.FindStringSubmatch(line); m != nil {
-			submap := submaps.Get(vars.Apply(m[2]))
-			submap.Binds = append(submap.Binds, &Bind{
-				Target{strings.TrimSpace(m[1]), strings.TrimSpace(m[3])},
-				strings.TrimSpace(m[4]),
-			})
-			continue
-		}
-
-		if m := aliasRx.FindStringSubmatch(line); m != nil {
-			submaps.Get(vars.Apply(m[1])).Alias = strings.TrimSpace(m[2])
-			continue
+	var binds []*Bind
+	check(json.Unmarshal(must(ipc.Call("j/binds"))[0], &binds))
+	for _, bind := range binds {
+		if submap, ok := submaps[bind.Modmask]; ok && bind.Submap == "" {
+			submap.Binds = append(submap.Binds, bind)
 		}
 	}
 
-	if err := scanner.Err(); err != nil {
-		panic(err)
-	}
-
-	submaps.Print()
+	Submaps(&cmd, submaps)
+	check(ipc.Exec(cmd))
 }
 
-func (v Variables) Apply(str string) string {
-	res := str
-	for i := len(v) - 1; i >= 0; i-- {
-		res = strings.ReplaceAll(res, v[i].Name, v[i].Value)
+func Submaps(c *ipc.Cmd, submaps map[mod.Mask]*Submap) {
+	order := make([]mod.Mask, 0, len(submaps))
+	for mask := range submaps {
+		order = append(order, mask)
 	}
-	return res
-}
+	slices.Sort(order)
 
-func (s Submaps) Get(mods string) *Submap {
-	var flags Flags
-	for _, mod := range modifiers {
-		for _, name := range mod.Name {
-			if strings.Contains(mods, name) {
-				flags |= mod.Flag
-			}
-		}
-	}
+	for i, mask := range order {
+		submap := submaps[mask]
 
-	if submap, ok := s[flags]; ok {
-		return submap
-	}
-	submap := &Submap{Alias: strings.TrimSpace(mods)}
-	s[flags] = submap
-	return submap
-}
+		Enter(c, mask, submap.Alias)
+		c.Keyword("submap", submap.Alias)
+		Exit(c, mask)
 
-func (s Submaps) Print() {
-	order := make([]Flags, 0, len(s))
-	for flags := range s {
-		order = append(order, flags)
-	}
-	sort.Slice(order, func(i, j int) bool { return order[i] < order[j] })
-
-	if order[0] == 0 {
-		order = order[1:]
-	}
-
-	for i, flags := range order {
-		submap := s[flags]
-		flags.PrintEnter(submap.Alias)
-
-		fmt.Printf("\nsubmap=%s\n", submap.Alias)
-
-		flags.PrintExit()
-
-		submap.Binds.Print(0, true)
+		Binds(c, 0, submap.Binds)
 
 		for _, next := range order[i+1:] {
-			if flags&next == flags {
-				child := s[next]
-				diff := next &^ flags
+			if mask&next == mask {
+				child := submaps[next]
+				diff := next &^ mask
 
-				diff.PrintEnter(child.Alias)
-				child.Binds.Print(diff, false)
+				Enter(c, diff, child.Alias)
+				Binds(c, diff, child.Binds)
 			}
 		}
 
-		fmt.Printf("\nbindrn=,catchall,submap,reset\nsubmap=reset\n")
+		c.Keyword("bindrn", "", "catchall", "submap", "reset")
+		c.Keyword("submap", "reset")
 	}
 }
 
-func (f Flags) String() string {
-	var mods []string
-	for _, mod := range modifiers {
-		if f&mod.Flag != 0 {
-			mods = append(mods, mod.Name[0])
-		}
-	}
-	return strings.Join(mods, "_")
-}
-
-func (f Flags) Mods() []*Modifier {
-	var mods []*Modifier
-	for _, mod := range modifiers {
-		if f&mod.Flag != 0 {
-			mods = append(mods, mod)
-		}
-	}
-	return mods
-}
-
-func (f Flags) PrintEnter(submap string) {
-	fmt.Printf("\n")
-	mods := f.String()
-	for _, mod := range f.Mods() {
-		for _, key := range mod.Keys {
-			fmt.Printf("bindr=%s,%s,submap,%s\n", mods, key, submap)
+func Enter(c *ipc.Cmd, mask mod.Mask, submap string) {
+	mods := mask.String()
+	for _, i := range mask.Info() {
+		for _, key := range i.Keys {
+			c.Keyword("bindr", mods, key, "submap", submap)
 		}
 	}
 }
 
-func (f Flags) PrintExit() {
-	fmt.Printf("\n")
-	for _, mod := range f.Mods() {
-		for _, key := range mod.Keys {
-			fmt.Printf("bindr=%s,%s,submap,reset\n", mod.Name[0], key)
+func Exit(c *ipc.Cmd, mask mod.Mask) {
+	for _, i := range mask.Info() {
+		for _, key := range i.Keys {
+			c.Keyword("bindr", i.Name[0], key, "submap", "reset")
 		}
 	}
 }
 
-func (b Binds) Print(flags Flags, reset bool) {
-	if len(b) == 0 {
-		return
+func Binds(c *ipc.Cmd, mask mod.Mask, binds []*Bind) {
+	mods := mask.String()
+	for _, bind := range binds {
+		if bind.Flags.Mouse {
+			c.Keyword(bind.String(), mods, bind.Key, bind.Arg)
+		} else {
+			c.Keyword(bind.String(), mods, bind.Key, bind.Dispatcher, bind.Arg)
+		}
 	}
 
-	fmt.Printf("\n")
-	mods := flags.String()
-	for _, bind := range b {
-		fmt.Printf(
-			"bind%s=%s,%s,%s\n",
-			bind.Flags,
-			mods,
-			bind.Key,
-			bind.Dispatch,
-		)
-	}
+	dedup := make(map[Target]struct{}, len(binds))
+	for _, bind := range binds {
+		if _, ok := dedup[bind.Target]; !ok {
+			dedup[bind.Target] = struct{}{}
 
-	if reset {
-		fmt.Printf("\n")
-		dedup := make(map[Target]struct{}, len(b))
-		for _, bind := range b {
-			if _, ok := dedup[bind.Target]; !ok {
-				fmt.Printf(
-					"bind%s=%s,%s,submap,reset\n",
-					strings.ReplaceAll(bind.Flags, "m", "r"),
-					mods,
-					bind.Key,
-				)
-				dedup[bind.Target] = struct{}{}
+			flags := bind.Flags
+			if flags.Mouse {
+				flags.Release = true
+				flags.Mouse = false
 			}
+
+			c.Keyword(flags.String(), mods, bind.Key, "submap", "reset")
 		}
 	}
+}
+
+func check(e error) {
+	if e != nil {
+		fmt.Fprintln(os.Stderr, e)
+		os.Exit(1)
+	}
+}
+
+func must[T any](t T, e error) T {
+	check(e)
+	return t
 }
