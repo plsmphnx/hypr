@@ -1,21 +1,24 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"slices"
 	"strings"
 
-	"github.com/plsmphnx/hypr/util/flag"
 	"github.com/plsmphnx/hypr/util/ipc"
 	"github.com/plsmphnx/hypr/util/mod"
 )
 
 type (
 	Target struct {
-		flag.Flags
-		Key string `json:"key"`
+		Locked       bool   `json:"locked"`
+		Release      bool   `json:"release"`
+		LongPress    bool   `json:"longPress"`
+		Repeat       bool   `json:"repeat"`
+		NonConsuming bool   `json:"non_consuming"`
+		Mouse        bool   `json:"mouse"`
+		Key          string `json:"key"`
 	}
 
 	Bind struct {
@@ -45,19 +48,17 @@ func main() {
 		submaps[mod.Parse(mods)] = submap
 	}
 
-	var cmd ipc.Cmd
-	ipc := ipc.New()
-
 	var binds []*Bind
-	check(json.Unmarshal(must(ipc.Call("j/binds"))[0], &binds))
+	check(ipc.Get{"binds": &binds}.Call())
 	for _, bind := range binds {
 		if submap, ok := submaps[bind.Modmask]; ok && bind.Submap == "" {
 			submap.Binds = append(submap.Binds, bind)
 		}
 	}
 
+	var cmd ipc.Cmd
 	Submaps(&cmd, submaps)
-	check(ipc.Exec(cmd))
+	check(cmd.Call())
 }
 
 func Submaps(c *ipc.Cmd, submaps map[mod.Mask]*Submap) {
@@ -110,28 +111,49 @@ func Exit(c *ipc.Cmd, mask mod.Mask) {
 
 func Binds(c *ipc.Cmd, mask mod.Mask, binds []*Bind) {
 	mods := mask.String()
+	reset := make(map[Target]struct{}, len(binds))
+
 	for _, bind := range binds {
-		if bind.Flags.Mouse {
-			c.Keyword(bind.String(), mods, bind.Key, bind.Arg)
+		if bind.Mouse {
+			c.Keyword(bind.Keyword(), mods, bind.Key, bind.Arg)
 		} else {
-			c.Keyword(bind.String(), mods, bind.Key, bind.Dispatcher, bind.Arg)
+			c.Keyword(bind.Keyword(), mods, bind.Key, bind.Dispatcher, bind.Arg)
+		}
+		if mask == 0 || !bind.Repeat {
+			reset[bind.Target] = struct{}{}
 		}
 	}
 
-	dedup := make(map[Target]struct{}, len(binds))
-	for _, bind := range binds {
-		if _, ok := dedup[bind.Target]; !ok {
-			dedup[bind.Target] = struct{}{}
-
-			flags := bind.Flags
-			if flags.Mouse {
-				flags.Release = true
-				flags.Mouse = false
-			}
-
-			c.Keyword(flags.String(), mods, bind.Key, "submap", "reset")
+	for t := range reset {
+		if t.Mouse {
+			t.Release = true
+			t.Mouse = false
 		}
+		c.Keyword(t.Keyword(), mods, t.Key, "submap", "reset")
 	}
+}
+
+func (t *Target) Keyword() string {
+	str := "bind"
+	if t.Locked {
+		str += "l"
+	}
+	if t.Release {
+		str += "r"
+	}
+	if t.LongPress {
+		str += "o"
+	}
+	if t.Repeat {
+		str += "e"
+	}
+	if t.NonConsuming {
+		str += "n"
+	}
+	if t.Mouse {
+		str += "m"
+	}
+	return str
 }
 
 func check(e error) {
@@ -139,9 +161,4 @@ func check(e error) {
 		fmt.Fprintln(os.Stderr, e)
 		os.Exit(1)
 	}
-}
-
-func must[T any](t T, e error) T {
-	check(e)
-	return t
 }

@@ -9,17 +9,13 @@ import (
 	"strings"
 )
 
-type IPC string
-
-func New() IPC {
-	return IPC(fmt.Sprintf("%s/hypr/%s/.socket.sock",
-		os.Getenv("XDG_RUNTIME_DIR"),
-		os.Getenv("HYPRLAND_INSTANCE_SIGNATURE"),
-	))
-}
-
-func (ipc IPC) Call(cmds ...string) ([][]byte, error) {
-	conn, err := net.DialUnix("unix", nil, &net.UnixAddr{Name: string(ipc)})
+func Call(cmds ...string) ([][]byte, error) {
+	conn, err := net.DialUnix("unix", nil, &net.UnixAddr{
+		Name: fmt.Sprintf("%s/hypr/%s/.socket.sock",
+			os.Getenv("XDG_RUNTIME_DIR"),
+			os.Getenv("HYPRLAND_INSTANCE_SIGNATURE"),
+		),
+	})
 	if err != nil {
 		return nil, err
 	}

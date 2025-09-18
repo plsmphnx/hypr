@@ -13,7 +13,7 @@
   in {
     packages = systems (pkgs: {
       jump = build pkgs "jump";
-      keys = build pkgs "keys";
+      mods = build pkgs "mods";
     });
   };
 }

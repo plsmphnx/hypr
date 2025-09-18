@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
 	"os"
@@ -46,17 +45,12 @@ func main() {
 		disp = []string{"workspace @"}
 	}
 
-	var cmd ipc.Cmd
-	ipc := ipc.New()
+	var active Workspace
+	var workspaces []Workspace
+	check(ipc.Get{"activeworkspace": &active, "workspaces": &workspaces}.Call())
+	slices.SortFunc(workspaces, func(a, b Workspace) int { return a.ID - b.ID })
 
-	var active *Workspace
-	var workspaces []*Workspace
-	info := must(ipc.Call("j/activeworkspace", "j/workspaces"))
-	check(json.Unmarshal(info[0], &active))
-	check(json.Unmarshal(info[1], &workspaces))
-	slices.SortFunc(workspaces, func(a, b *Workspace) int { return a.ID - b.ID })
-
-	var monitor []*Workspace
+	var monitor []Workspace
 	for i, ws := range workspaces {
 		ws.i = i
 		if ws.MonitorID == active.MonitorID {
@@ -97,10 +91,11 @@ func main() {
 		}
 	}()))
 
+	var cmd ipc.Cmd
 	for _, d := range disp {
 		cmd.Dispatch(strings.ReplaceAll(d, "@", fmt.Sprint(id)))
 	}
-	check(ipc.Exec(cmd))
+	check(cmd.Call())
 }
 
 func check(e error) {
@@ -108,9 +103,4 @@ func check(e error) {
 		fmt.Fprintln(os.Stderr, e)
 		os.Exit(1)
 	}
-}
-
-func must[T any](t T, e error) T {
-	check(e)
-	return t
 }

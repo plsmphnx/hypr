@@ -23,15 +23,16 @@ func (c *Cmd) add(t, n string, a ...string) {
 	*c = append(*c, t)
 }
 
-func (ipc IPC) Exec(cmd Cmd) error {
-	res, err := ipc.Call(cmd...)
+func (cmd Cmd) Call() error {
+	res, err := Call(cmd...)
 	if err != nil {
 		return err
 	}
 	var e Err
 	for i, r := range res {
-		if string(r) != "ok" {
-			e = append(e, struct{ Cmd, Err string }{cmd[i], string(r)})
+		sr := string(r)
+		if sr != "ok" {
+			e = append(e, struct{ Cmd, Err string }{cmd[i], sr})
 		}
 	}
 	if len(e) > 0 {
