@@ -34,7 +34,7 @@ func main() {
 			free = 1
 		default:
 			if strings.IndexByte(arg, ' ') < 0 {
-				disp = append(disp, arg+" #")
+				disp = append(disp, arg+" ^")
 			} else {
 				disp = append(disp, arg)
 			}
@@ -42,7 +42,7 @@ func main() {
 	}
 
 	if len(disp) == 0 {
-		disp = []string{"workspace #"}
+		disp = []string{"workspace ^"}
 	}
 
 	var active Workspace
@@ -93,7 +93,7 @@ func main() {
 
 	var cmd ipc.Cmd
 	for _, d := range disp {
-		cmd.Dispatch(strings.ReplaceAll(d, "#", strconv.Itoa(id)))
+		cmd.Dispatch(strings.ReplaceAll(d, "^", strconv.Itoa(id)))
 	}
 	check(cmd.Call())
 }

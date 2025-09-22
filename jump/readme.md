@@ -19,9 +19,9 @@ hyprjump [next/prev] [used/free] [dispatchers...]
   (`used`) or jump to the next empty workspace (`free`). Defaults to neither.
 - `dispatchers` - Any argument that isn't one of the above keywords will be
   treated as a dispatcher to send to Hyprland, in order. If the dispatcher has
-  arguments, any `#` will be replaced with the selected workspace ID; with no
+  arguments, any `^` will be replaced with the selected workspace ID; with no
   arguments, the workspace ID will be added as a single argument. If none are
-  provided, this defaults to `workspace #`.
+  provided, this defaults to `workspace ^`.
 
 Note that the argument parser is fairly unopinionated for simplicity; if
 multiple incompatible keywords are given, the last one will take effect.
@@ -31,4 +31,4 @@ multiple incompatible keywords are given, the last one will take effect.
 - Go to the next occupied workspace: `hyprjump next used`
 - Move the current window to the previous workspace:
   `hyprjump movetoworkspace prev`
-- Open `foot` on a new workspace: `hyprjump free "exec [workspace #] foot"`
+- Open `foot` on a new workspace: `hyprjump free "exec [workspace ^] foot"`
