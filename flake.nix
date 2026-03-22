@@ -6,8 +6,8 @@
     in pkgs.stdenv.mkDerivation {
       name = bin;
       src = ./.;
-      nativeBuildInputs = [ pkgs.go ];
-      buildPhase = "HOME=. go build -o ${bin} ./${name}";
+      nativeBuildInputs = [ pkgs.nim ];
+      buildPhase = "HOME=. nim c -d:release -o:${bin} ./${name}/main.nim";
       installPhase = "mkdir -p $out/bin && mv ${bin} $out/bin";
     };
   in {
