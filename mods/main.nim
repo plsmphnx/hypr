@@ -80,7 +80,7 @@ proc submaps(cmd: var Ipc, subs: Table[Mask, Submap]) =
 
     cmd.keys Empty, sub.binds
 
-    for next in order[i + 1 ..^ 1]:
+    for next in order[i + 1 .. ^1]:
       if next.includes mask:
         let child = subs[next]
         let diff = next.without mask

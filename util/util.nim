@@ -1,17 +1,11 @@
-import std/[net, paths, strutils]
+import std/[net, strutils]
 
-proc newUnixSocket*(path: Path): Socket =
-  let socket = newSocket(AF_UNIX, SOCK_STREAM, IPPROTO_IP)
-  socket.connectUnix $path
-  socket
-
-const BUFFER = 8192
+proc newUnixSocket*(): Socket =
+  newSocket AF_UNIX, SOCK_STREAM, IPPROTO_IP
 
 proc recvAll*(socket: Socket): string =
   var res: string
-  var read = BUFFER
-  while read == BUFFER:
-    read = socket.recv(res, BUFFER)
+  while socket.recv(res, 8192) > 0:
     result.add res
 
 proc cut*(str: string, chr: char): (string, string) =

@@ -1,25 +1,28 @@
-import std/[envvars, json, macros, net, paths, strutils]
+import std/[envvars, json, macros, net, strutils]
 import ./util
 
 type Ipc* = distinct seq[string]
 type Err* = object of CatchableError
 
 proc call(cmds: varargs[string]): seq[string] =
-  if cmds.len == 0:
-    return
-
-  let sock = newUnixSocket:
-    "XDG_RUNTIME_DIR".getEnv.Path / "hypr".Path /
-      "HYPRLAND_INSTANCE_SIGNATURE".getEnv.Path / ".socket.sock".Path
-  defer:
-    sock.close
-
-  sock.send:
-    if cmds.len > 1:
-      "[[BATCH]]" & cmds.join ";"
-    else:
+  let msg =
+    case cmds.len
+    of 0:
+      return
+    of 1:
       cmds[0]
-  sock.recvAll.split "\n\n\n"
+    else:
+      "[[BATCH]]" & cmds.join ";"
+
+  let socket = newUnixSocket()
+  defer:
+    socket.close
+  socket.connectUnix:
+    "XDG_RUNTIME_DIR".getEnv & "/hypr/" & "HYPRLAND_INSTANCE_SIGNATURE".getEnv &
+      "/.socket.sock"
+
+  socket.send msg
+  socket.recvAll.split "\n\n\n"
 
 proc add(ipc: var Ipc, t, n: string, args: varargs[string]) =
   seq[string](ipc).add:
