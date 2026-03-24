@@ -1,6 +1,6 @@
 import std/[bitops, strutils]
 
-type Mask* = distinct uint8
+type Mask* = distinct byte
 
 type Info* = tuple[name: seq[string], keys: seq[string]]
 
@@ -17,29 +17,29 @@ const MODS = [
 
 const Empty* = 0.Mask
 
-proc parse*(mods: string): Mask =
+proc toMask*(mods: string): Mask =
   for i, m in MODS:
     for n in m.name:
       if mods.contains n:
-        result.uint8.setBit i
+        result.byte.setBit i
 
 proc `$`*(mask: Mask): string =
   var mods: seq[string]
   for i, m in MODS:
-    if mask.uint8.testBit i:
+    if mask.byte.testBit i:
       mods.add m.name[0]
   mods.join "_"
 
 proc info*(mask: Mask): seq[Info] =
   for i, m in MODS:
-    if mask.uint8.testBit i:
+    if mask.byte.testBit i:
       result.add m
 
 proc includes*(parent, child: Mask): bool =
-  child.uint8 == parent.uint8.bitand child.uint8
+  child.byte == parent.byte.bitand child.byte
 
 proc without*(parent, child: Mask): Mask =
-  Mask(parent.uint8.clearMasked child.uint8)
+  Mask(parent.byte.clearMasked child.byte)
 
 proc `==`*(a, b: Mask): bool {.borrow.}
 proc `<`*(a, b: Mask): bool {.borrow.}

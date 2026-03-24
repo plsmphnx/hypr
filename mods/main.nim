@@ -1,5 +1,5 @@
-import std/[algorithm, cmdline, sets, strutils, tables]
-import ../util/[ipc, mods, util]
+import std/[algorithm, cmdline, sequtils, sets, strmisc, strutils, tables]
+import ../util/[ipc, mods]
 
 type Target = object of RootObj
   locked: bool
@@ -23,23 +23,23 @@ type Submap = ref object
 proc keyword(tgt: Target): string =
   result = "bind"
   if tgt.locked:
-    result &= "l"
+    result.add 'l'
   if tgt.release:
-    result &= "r"
+    result.add 'r'
   if tgt.longPress:
-    result &= "o"
+    result.add 'o'
   if tgt.repeat:
-    result &= "e"
+    result.add 'e'
   if tgt.non_consuming:
-    result &= "n"
+    result.add 'n'
   if tgt.mouse:
-    result &= "m"
+    result.add 'm'
 
-proc enter(cmd: var Ipc, mask: Mask, sub: string) =
+proc enter(cmd: var Ipc, mask: Mask, alias: string) =
   let mods = $mask
   for info in mask.info:
     for key in info.keys:
-      cmd.keyword "bindr", mods, key, "submap", sub
+      cmd.keyword "bindr", mods, key, "submap", alias
 
 proc exit(cmd: var Ipc, mask: Mask) =
   for info in mask.info:
@@ -66,21 +66,16 @@ proc keys(cmd: var Ipc, mask: Mask, binds: seq[Bind]) =
     cmd.keyword cpy.keyword, mods, cpy.key, "submap", "reset"
 
 proc submaps(cmd: var Ipc, subs: Table[Mask, Submap]) =
-  var order = newSeqOfCap[Mask] subs.len
-  for mask, _ in subs:
-    order.add mask
-  order.sort
-
+  let order = subs.keys.toSeq.sorted
   for i, mask in order:
     let sub = subs[mask]
 
     cmd.enter mask, sub.alias
     cmd.keyword "submap", sub.alias
     cmd.exit mask
-
     cmd.keys Empty, sub.binds
 
-    for next in order[i + 1 .. ^1]:
+    for next in order[i + 1 ..^ 1]:
       if next.includes mask:
         let child = subs[next]
         let diff = next.without mask
@@ -94,8 +89,8 @@ proc submaps(cmd: var Ipc, subs: Table[Mask, Submap]) =
 let args = commandLineParams()
 var subs = initTable[Mask, Submap] args.len
 for arg in args:
-  let (mods, alias) = arg.cut '='
-  subs[mods.parse] = Submap(alias: if alias != "": alias else: mods.strip)
+  let (mods, _, alias) = arg.partition "="
+  subs[mods.toMask] = Submap(alias: if alias != "": alias else: mods.strip)
 
 ipc:
   let binds: seq[Bind]
