@@ -2,38 +2,40 @@ import std/[bitops, strutils]
 
 type Mask* = distinct byte
 
-type Info* = tuple[name: seq[string], keys: seq[string]]
+type Info* = tuple
+  name: string
+  keys: seq[string]
 
 const MODS = [
-  (name: @["SHIFT"], keys: @["shift_l", "shift_r"]),
-  (name: @["CAPS"], keys: @["caps_lock"]),
-  (name: @["CTRL", "CONTROL"], keys: @["control_l", "control_r"]),
-  (name: @["ALT"], keys: @["alt_l", "alt_r"]),
-  (name: @["MOD2"], keys: @[]),
-  (name: @["MOD3"], keys: @[]),
-  (name: @["SUPER", "WIN", "LOGO", "MOD4"], keys: @["super_l", "super_r"]),
-  (name: @["MOD5"], keys: @[]),
+  (@["SHIFT"], @["shift_l", "shift_r"]),
+  (@["CAPS"], @["caps_lock"]),
+  (@["CTRL", "CONTROL"], @["control_l", "control_r"]),
+  (@["ALT"], @["alt_l", "alt_r"]),
+  (@["MOD2"], @[]),
+  (@["MOD3"], @[]),
+  (@["SUPER", "WIN", "LOGO", "MOD4"], @["super_l", "super_r"]),
+  (@["MOD5"], @[]),
 ]
 
 const Empty* = 0.Mask
 
 proc toMask*(mods: string): Mask =
-  for i, m in MODS:
-    for n in m.name:
-      if mods.contains n:
+  for i, (names, _) in MODS:
+    for name in names:
+      if mods.contains name:
         result.byte.setBit i
 
 proc `$`*(mask: Mask): string =
   var mods: seq[string]
-  for i, m in MODS:
+  for i, (names, _) in MODS:
     if mask.byte.testBit i:
-      mods.add m.name[0]
+      mods.add names[0]
   mods.join "_"
 
-proc info*(mask: Mask): seq[Info] =
-  for i, m in MODS:
+iterator info*(mask: Mask): Info =
+  for i, (names, keys) in MODS:
     if mask.byte.testBit i:
-      result.add m
+      yield (names[0], keys)
 
 proc includes*(parent, child: Mask): bool =
   child.byte == parent.byte.bitand child.byte

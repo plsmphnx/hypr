@@ -37,14 +37,14 @@ proc keyword(tgt: Target): string =
 
 proc enter(cmd: var Ipc, mask: Mask, alias: string) =
   let mods = $mask
-  for info in mask.info:
-    for key in info.keys:
+  for _, keys in mask.info:
+    for key in keys:
       cmd.keyword "bindr", mods, key, "submap", alias
 
 proc exit(cmd: var Ipc, mask: Mask) =
-  for info in mask.info:
-    for key in info.keys:
-      cmd.keyword "bindr", info.name[0], key, "submap", "reset"
+  for name, keys in mask.info:
+    for key in keys:
+      cmd.keyword "bindr", name, key, "submap", "reset"
 
 proc keys(cmd: var Ipc, mask: Mask, binds: seq[Bind]) =
   let mods = $mask
