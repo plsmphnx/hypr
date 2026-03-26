@@ -16,7 +16,7 @@ type Bind = object of Target
   dispatcher: string
   arg: string
 
-type Submap = ref object
+type Submap = object
   alias: string
   binds: seq[Bind]
 

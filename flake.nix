@@ -7,7 +7,7 @@
       name = bin;
       src = ./.;
       nativeBuildInputs = [ pkgs.nim ];
-      buildPhase = "HOME=. nim c -d:release -o:${bin} ./${name}/main.nim";
+      buildPhase = "HOME=. nim c -d:release -d:strip -o:${bin} ./${name}/main.nim";
       installPhase = "mkdir -p $out/bin && mv ${bin} $out/bin";
     };
   in {
