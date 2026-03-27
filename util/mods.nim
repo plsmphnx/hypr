@@ -2,10 +2,6 @@ import std/[bitops, strutils]
 
 type Mask* = distinct byte
 
-type Info* = tuple
-  name: string
-  keys: seq[string]
-
 const MODS = [
   (@["SHIFT"], @["shift_l", "shift_r"]),
   (@["CAPS"], @["caps_lock"]),
@@ -32,7 +28,7 @@ proc `$`*(mask: Mask): string =
       mods.add names[0]
   mods.join "_"
 
-iterator info*(mask: Mask): Info =
+iterator info*(mask: Mask): (string, seq[string]) =
   for i, (names, keys) in MODS:
     if mask.byte.testBit i:
       yield (names[0], keys)
