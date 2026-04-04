@@ -15,7 +15,7 @@ const MODS = [
 
 const Empty* = 0.Mask
 
-proc toMask*(mods: string): Mask =
+converter toMask*(mods: string): Mask =
   for i, (names, _) in MODS:
     for name in names:
       if mods.contains name:

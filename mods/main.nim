@@ -90,7 +90,7 @@ let args = commandLineParams()
 var subs = initTable[Mask, Submap] args.len
 for arg in args:
   let (mods, _, alias) = arg.partition "="
-  subs[mods.toMask] = Submap(alias: if alias != "": alias else: mods.strip)
+  subs[mods] = Submap(alias: if alias != "": alias else: mods.strip)
 
 ipc:
   let binds: seq[Bind]
